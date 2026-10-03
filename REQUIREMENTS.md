@@ -20,22 +20,23 @@ Two modes in **one app** (role chosen at start):
 | **BLE advertising + RSSI** | Yes — core of the MVP | Presence within ~10–30 m indoors, rough distance band, warmer/colder trend | RSSI is noisy; walls, rubble and bodies change it by 10–20 dB. Gives distance bands, not metres. No direction. |
 | **Barometer** | Yes | Floor difference between rescuer and victim (~12 Pa per metre, ~0.35 hPa per floor) | Not every phone has one. Different phones can disagree by ~1 hPa (= several floors) unless calibrated. Fire and ventilation change local pressure. |
 | **GPS** | Partly | Last good fix before entering the building → which building / entrance | Useless indoors and under rubble. Send the last fix with its age and accuracy. |
-| **Wi-Fi scan fingerprint** | Partly | List of visible access points and their strengths; rescuer compares with their own scan ("you see the same APs") | Android throttles scans (4 per 2 min in foreground). APs may lose power in a fire. Stretch goal. |
-| **"Share Wi-Fi" / hotspot** | Mostly no | — | Apps cannot turn on normal tethering. `LocalOnlyHotspot` is possible but adds little over BLE and drains battery. Skip. |
-| **Wi-Fi Aware / RTT ranging** | Device-dependent | 1–2 m ranging between two phones | Supported on a minority of devices. Stretch goal. |
+| **Wi-Fi scan fingerprint** хз мб кал | Partly | List of visible access points and their strengths; rescuer compares with their own scan ("you see the same APs") | Android throttles scans (4 per 2 min in foreground). APs may lose power in a fire. Stretch goal. |
+| **"Share Wi-Fi" / hotspot** мб кал | Mostly no | — | Apps cannot turn on normal tethering. `LocalOnlyHotspot` is possible but adds little over BLE and drains battery. Skip. |
+| **Wi-Fi Aware / RTT ranging** мб кал | Device-dependent | 1–2 m ranging between two phones | Supported on a minority of devices. Stretch goal. |
 | **UWB** | Device-dependent | ~10–30 cm distance plus direction | Only flagship phones (Pixel Pro, Galaxy S Plus/Ultra). Best possible result if both demo phones support it. Stretch goal. |
 | **Sound + flashlight** | Yes, trivial | Siren and strobe so the rescuer can hear/see the phone in the last few metres | Real firefighter PASS devices work this way. High value for low effort. |
 | **Accelerometer** | Yes | "Person is moving / not moving" status | — |
 | **Automatic fire detection** | No | — | Phones have no smoke or usable temperature sensor. See triggers below. |
+мб + батарэя, тэмпература, рух (і як атрымаць direction)
  
 ### How emergency mode starts (instead of "phone detects fire")
  
-1. **Manual SOS** — big button, plus hold-to-activate to avoid false alarms. (MVP)
+1. **Manual SOS** (мне падаецца не нашая ідэя) — big button, plus hold-to-activate to avoid false alarms. (MVP)
 2. **Remote activation** — dispatcher/rescuer creates an incident on the backend; phones with the app inside the incident area get a push and switch to beacon mode after a 15 s "I'm safe" countdown. (MVP if time, otherwise stretch)
 3. **No-motion detection** — while an incident is active, no movement for N seconds marks the victim as "possibly unconscious". (Stretch)
-4. **Smoke alarm sound recognition** via microphone. (Stretch, risky)
+4. **Smoke alarm sound recognition** (які нах смоўк дэтэкшн) via microphone. (Stretch, risky)
 ## 3. Problems with the original idea and how we address them
- 
+похуй
 | Problem | Fix |
 |---|---|
 | Victim must have the app installed *before* the fire | Pitch it for defined groups: employees of a factory / office / dorm, or **firefighters themselves** ("firefighter down" locator). Long term: integrate into an existing alert app or the OS. |
@@ -48,7 +49,7 @@ Two modes in **one app** (role chosen at start):
 | Privacy | Nothing is broadcast outside emergency mode. Random per-incident ID in the BLE packet, no personal data. |
  
 ## 4. Architecture
- 
+ напэўна норм
 ```
 ┌──────────────┐   BLE advertising (always)   ┌──────────────┐
 │ Victim phone │ ───────────────────────────▶ │ Rescuer phone│
@@ -63,7 +64,7 @@ Two modes in **one app** (role chosen at start):
 ```
  
 ### Repository layout (monorepo)
- 
+ напэўна норм, чэкнуць
 ```
 rescue-beacon/
 ├── android/          # one Kotlin app, two modes
@@ -75,24 +76,24 @@ rescue-beacon/
 ## 5. Tech stack
  
 **Android (Kotlin)**
-- Jetpack Compose, single activity, Navigation Compose
-- minSdk 26, targetSdk 35
-- BLE: platform `BluetoothLeAdvertiser`, `BluetoothLeScanner`, GATT server/client
-- Foreground service (`connectedDevice` + `location` types) so the beacon survives screen-off
-- Sensors: `SensorManager` (`TYPE_PRESSURE`, `TYPE_ACCELEROMETER`), `FusedLocationProviderClient`
-- Networking: Retrofit or Ktor client, OkHttp WebSocket, kotlinx.serialization
-- Coroutines + Flow, ViewModel
-- Optional: `androidx.core.uwb`, Wi-Fi Aware, Firebase Cloud Messaging, osmdroid / Google Maps
+- (хв)Jetpack Compose, single activity, Navigation Compose
+- (ок)minSdk 26, targetSdk 35
+- (ок)BLE: platform `BluetoothLeAdvertiser`, `BluetoothLeScanner`, GATT server/client
+- (хв)Foreground service (`connectedDevice` + `location` types) so the beacon survives screen-off
+- (ок)Sensors: `SensorManager` (`TYPE_PRESSURE`, `TYPE_ACCELEROMETER`), `FusedLocationProviderClient`
+- (хв)Networking: Retrofit or Ktor client, OkHttp WebSocket, kotlinx.serialization
+- (нібы кал)Coroutines + Flow, ViewModel
+- (хв, бліжэй кал)Optional: `androidx.core.uwb`, Wi-Fi Aware, Firebase Cloud Messaging, osmdroid / Google Maps
 **Backend (Python)**
-- FastAPI + Uvicorn, Pydantic v2
-- WebSockets for live updates to rescuers
-- SQLite via SQLModel (Postgres later)
-- Docker; expose with ngrok or deploy to Render / Fly.io for the demo
+- (без піданцік)FastAPI + Uvicorn, Pydantic v2
+- (ок)WebSockets for live updates to rescuers
+- (кал)SQLite via SQLModel (Postgres later)
+- (кал)Docker; expose with ngrok or deploy to Render / Fly.io for the demo
 **Permissions**
 `BLUETOOTH_ADVERTISE`, `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION` (optional), `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`, `FOREGROUND_SERVICE_LOCATION`, `POST_NOTIFICATIONS`, `NEARBY_WIFI_DEVICES` (stretch), `INTERNET`
  
 ## 6. BLE protocol
- 
+ хв абсалютна
 - **Advertisement packet:** flags + one 128-bit service UUID (rescuers filter scans on it).
 - **Scan response:** manufacturer-specific data (company ID `0xFFFF`), 18-byte payload:
 | Bytes | Field | Notes |
@@ -109,7 +110,7 @@ rescue-beacon/
 - Advertising: low-latency mode, high TX power, payload refreshed every 2–5 s.
 - **GATT service (stretch):** read characteristic with extended JSON (name, medical note, Wi-Fi fingerprint); write characteristic so the rescuer can trigger the siren or send "help is coming".
 ## 7. Distance and floor estimation
- 
+ можна але і пьюр даныя трэба захаваць
 **Distance (rescuer phone, local)**
 1. Collect RSSI per beacon, median filter over the last ~2 s, then exponential smoothing.
 2. Path-loss model: `d = 10 ^ ((P1m − RSSI) / (10 · n))`, with `P1m ≈ −59 dBm` (calibrate on the demo phones) and `n ≈ 2.5–3.5` indoors.
@@ -125,26 +126,26 @@ rescue-beacon/
 ## 8. Functional requirements
  
 ### Victim mode
-- **V1** (MVP) Hold-to-activate SOS button starts emergency mode.
-- **V2** (MVP) Foreground service advertises the BLE beacon with the payload from section 6.
-- **V3** (MVP) Read barometer, battery, motion state, last known GPS fix; refresh the payload.
-- **V4** (MVP) POST telemetry to the backend every 5 s while a connection exists; queue and retry when offline.
-- **V5** (MVP) Siren + flashlight strobe, on by default in bursts, with a mute toggle.
-- **V6** (MVP) Simple high-contrast screen: status, "rescuers nearby: N", cancel with confirmation.
-- **V7** (Stretch) Remote activation by incident push with "I'm safe" countdown.
-- **V8** (Stretch) Optional profile: name, number of people with me, medical note.
-- **V9** (Stretch) Wi-Fi fingerprint upload; UWB / Wi-Fi Aware ranging responder.
+- (падаецца кал)**V1** (MVP) Hold-to-activate SOS button starts emergency mode.
+- (ок)**V2** (MVP) Foreground service advertises the BLE beacon with the payload from section 6.
+- (ок)**V3** (MVP) Read barometer, battery, motion state, last known GPS fix; refresh the payload.
+- (хв)**V4** (MVP) POST telemetry to the backend every 5 s while a connection exists; queue and retry when offline.
+- (ок)**V5** (MVP) Siren + flashlight strobe, on by default in bursts, with a mute toggle.
+- (норм але не мвп)**V6** (MVP) Simple high-contrast screen: status, "rescuers nearby: N", cancel with confirmation.
+- (пох)**V7** (Stretch) Remote activation by incident push with "I'm safe" countdown.
+- (пох)**V8** (Stretch) Optional profile: name, number of people with me, medical note.
+- (кал)**V9** (Stretch) Wi-Fi fingerprint upload; UWB / Wi-Fi Aware ranging responder.
 ### Rescuer mode
-- **R1** (MVP) Scan for beacons continuously, filtered by the service UUID.
-- **R2** (MVP) Victim list sorted by estimated distance: band, floor difference, battery, moving / not moving, last seen.
-- **R3** (MVP) Finder screen for one victim: large distance band, trend indicator, floor difference, audio feedback.
-- **R4** (MVP) Upload sightings to the backend; receive live victim updates over WebSocket.
-- **R5** (MVP) Mark victim as "found / rescued"; status propagates to all rescuers.
-- **R6** (Stretch) Map with the victims' last GPS fixes and the incident area.
-- **R7** (Stretch) Create an incident (location + radius) that remotely activates victim phones.
-- **R8** (Stretch) Trigger the victim's siren remotely over GATT.
-- **R9** (Stretch) UWB precision finding with direction arrow.
-### Backend
+- (ок)**R1** (MVP) Scan for beacons continuously, filtered by the service UUID.
+- (ок)**R2** (MVP) Victim list sorted by estimated distance: band, floor difference, battery, moving / not moving, last seen.
+- (аўдыя важна, не будзе рэск'юер глядзець тэлефон)**R3** (MVP) Finder screen for one victim: large distance band, trend indicator, floor difference, audio feedback.
+- (пакуль пох)**R4** (MVP) Upload sightings to the backend; receive live victim updates over WebSocket.
+- (ок)**R5** (MVP) Mark victim as "found / rescued"; status propagates to all rescuers.
+- (хв)**R6** (Stretch) Map with the victims' last GPS fixes and the incident area.
+- (мм че мб)**R7** (Stretch) Create an incident (location + radius) that remotely activates victim phones.
+- (ок але і так павінна быць у вікціма)**R8** (Stretch) Trigger the victim's siren remotely over GATT.
+- (цяжка але хайпова)**R9** (Stretch) UWB precision finding with direction arrow.
+### Backend (вы казалі не адразу)
 - **B1** (MVP) `POST /incidents`, `GET /incidents/{id}`
 - **B2** (MVP) `POST /victims/{beacon_id}/telemetry` — pressure, battery, motion, GPS, timestamp
 - **B3** (MVP) `POST /sightings` — rescuer ID, beacon ID, RSSI, rescuer pressure, rescuer GPS, timestamp
@@ -155,8 +156,8 @@ rescue-beacon/
 - **B8** (Stretch) FCM push for remote activation; rescuer authentication
 ## 9. Non-functional requirements
  
-- Works with no internet and no Wi-Fi (BLE path).
-- Beacon keeps running with the screen off and the app in the background.
+- (галоўнае)Works with no internet and no Wi-Fi (BLE path).
+- (выратавальнік)Beacon keeps running with the screen off and the app in the background.
 - Beacon discovered within 5 s of the rescuer coming into range.
 - Victim UI usable in panic: one action to start, large targets, dark high-contrast theme.
 - Beacon mode should last at least 4 hours on 30 % battery (BLE only, siren in bursts).
@@ -166,22 +167,22 @@ rescue-beacon/
 **Team split**
 - Android A: victim mode (foreground service, advertiser, sensors, siren)
 - Android B: rescuer mode (scanner, RSSI filtering, finder UI)
-- Backend: FastAPI, data model, WebSocket, fusion logic
+- (я мб магу хв)Backend: FastAPI, data model, WebSocket, fusion logic
 - Fourth person / shared: API contract, calibration, demo script, pitch
-**Order of work**
+**Order of work** усё па-новай самі
 1. Agree on the BLE payload and API contract (sections 6 and 8).
 2. BLE advertise → scan → RSSI on screen between two phones. This is the main technical risk; do it first.
 3. Distance bands + barometer floor difference.
 4. Backend telemetry and sightings, live victim list.
 5. Siren, strobe, polish, calibration on the demo phones.
 6. Stretch goals only after the demo path works end to end.
-**Demo script**
+**Demo script** усё самі
 1. Hide the victim phone in another room or on another floor, activate SOS.
 2. Turn off Wi-Fi and mobile data on both phones to show offline search.
 3. Rescuer walks in: beacon appears, floor difference shown, distance band shrinks, beeps speed up, siren heard.
 4. Turn data back on: show the backend view with last GPS fix, battery and "rescued" status.
 ## 11. Risks
- 
+ похуй
 | Risk | Mitigation |
 |---|---|
 | A demo phone does not support BLE peripheral (advertising) mode | Check `isMultipleAdvertisementSupported()` on all phones on day one |
@@ -190,7 +191,7 @@ rescue-beacon/
 | Vendor battery savers kill the service (Xiaomi, Huawei, Samsung) | Foreground service, disable battery optimisation for the app on demo phones |
 | Venue Wi-Fi blocks the backend | Phone hotspot + ngrok, or a deployed instance |
  
-## 12. Future improvements
+## 12. Future improvements похуй
  
 - UWB and Wi-Fi RTT for metre-level or better ranging
 - Mesh relay: victim phones relay each other's beacons to extend range
