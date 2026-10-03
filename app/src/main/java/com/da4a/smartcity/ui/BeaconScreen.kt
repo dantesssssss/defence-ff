@@ -2,11 +2,14 @@ package com.da4a.smartcity.ui
 
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -103,7 +106,8 @@ fun BeaconScreen(
         }
     }
 
-    val peer = peers.maxByOrNull { it.rssi }
+    // Only phones whose owner asked for help are searched for.
+    val peer = peers.filter { it.payload?.emergency == true }.maxByOrNull { it.rssi }
     val prox = peer?.let { proximity[it.id] }
     val distance = prox?.distanceM
     val lost = prox != null && now - prox.updatedMs > SIGNAL_LOST_MS
@@ -121,6 +125,8 @@ fun BeaconScreen(
     val secondary by animateColorAsState(
         if (here) Color.White.copy(alpha = 0.85f) else IosSecondaryLabel, tween(500), label = "secondary",
     )
+    // The red caption would clash with the green background.
+    val accent by animateColorAsState(if (here) IosLabel else IosRed, tween(500), label = "accent")
 
     CompositionLocalProvider(LocalContentColor provides IosLabel) {
         Column(
@@ -140,7 +146,7 @@ fun BeaconScreen(
                     else -> "Far"
                 }
                 val subtitle = when {
-                    prox == null -> "Looking for the other phone"
+                    prox == null -> "Looking for people who need help"
                     lost -> "Signal lost"
                     here -> ""
                     else -> when (prox.trend) {
@@ -160,6 +166,13 @@ fun BeaconScreen(
                 // Laid out from the start but invisible, so the circle does not jump when they appear.
                 val detailsAlpha by animateFloatAsState(if (prox != null) 1f else 0f, tween(500), label = "details")
 
+                AnimatedVisibility(
+                    visible = prox != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    MedicalIdCard(DemoVictim, surface, secondary, accent, Modifier.padding(bottom = 16.dp))
+                }
                 Header(title, subtitle, if (lost) IosOrange else secondary)
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     ProximityCircle(closeness, style)
@@ -336,6 +349,7 @@ private fun PreviewScreen(distanceM: Float?, trend: Trend = Trend.STEADY, silent
     val now = SystemClock.elapsedRealtime()
     val payload = BeaconPayload(
         deviceId = 1, batteryPct = 82, pressurePa = 100_840, lat = 52.2297, lon = 21.0122, fixAgeMin = 0, seq = 0,
+        emergency = true,
     )
     val proximity = distanceM?.let { mapOf(1L to Proximity(it, false, -60f, trend, now - silentMs)) } ?: emptyMap()
     SmartCityTheme {
