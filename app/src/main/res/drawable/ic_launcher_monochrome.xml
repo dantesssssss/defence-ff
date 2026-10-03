@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- reme-icon.svg. Its 100 units span the 72 dp an adaptive icon shows (1 unit = 0.72 dp). -->
+<!-- Themed icons tint one colour, so the red disc would swallow the line: only the line. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -9,11 +9,8 @@
         android:translateX="25"
         android:translateY="25">
         <path
-            android:fillColor="#FF453A"
-            android:pathData="M8,50a42,42 0,1 0,84 0a42,42 0,1 0,-84 0z" />
-        <path
             android:pathData="M22.4,50H35.6L41,38L48.2,64.4L55.4,32L60.8,58.4L65,50H77.6"
-            android:strokeColor="#FEA6A2"
+            android:strokeColor="#FFFFFF"
             android:strokeLineCap="round"
             android:strokeLineJoin="round"
             android:strokeWidth="5.4" />
