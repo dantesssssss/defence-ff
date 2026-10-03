@@ -43,7 +43,7 @@ private class RssiFilter {
  * re-calibrates the RSSI-to-distance mapping and is blended in while it is fresh. The output
  * therefore never jumps between two differently scaled sources.
  */
-class ProximityTracker {
+class ProximityTracker(private val clock: () -> Long = SystemClock::elapsedRealtime) {
 
     val states = mutableStateMapOf<Long, Proximity>()
 
@@ -60,7 +60,9 @@ class ProximityTracker {
         var rangeM: Float? = null
         var rangeTimeMs = 0L
         val rangeWindow = ArrayDeque<Float>()
-        /** (time, closeness level in dB): higher is closer. */
+        /** Last distance received from the other phone, which repeats it in every advertisement. */
+        var sharedRangeM: Float? = null
+        /** (time, smoothed RSSI): higher is closer. */
         val history = ArrayDeque<Pair<Long, Float>>()
         var trend = Trend.STEADY
     }
@@ -70,7 +72,7 @@ class ProximityTracker {
     /** RSSI of a received advertisement. */
     fun onBle(peerId: Long, rssi: Int) {
         val track = tracks.getOrPut(peerId) { Track() }
-        val now = SystemClock.elapsedRealtime()
+        val now = clock()
         track.advRssi = track.advRssi?.let { it + ADV_ALPHA * (rssi - it) } ?: rssi.toFloat()
         track.advTimeMs = now
         // While the connection delivers readings it is the only source, so the estimate does
@@ -83,7 +85,7 @@ class ProximityTracker {
     /** RSSI of the Bluetooth connection, shifted onto the same scale as advertisements. */
     fun onConnRssi(peerId: Long, rssi: Int) {
         val track = tracks.getOrPut(peerId) { Track() }
-        val now = SystemClock.elapsedRealtime()
+        val now = clock()
         track.connTimeMs = now
         val adv = track.advRssi
         if (adv != null && now - track.advTimeMs < ADV_FRESH_MS) {
@@ -100,6 +102,12 @@ class ProximityTracker {
      */
     fun onRange(peerId: Long, distanceM: Float, raw: Boolean = true) {
         val track = tracks.getOrPut(peerId) { Track() }
+        // The other phone keeps repeating its last distance for seconds. Counting every repeat
+        // made an old distance look fresh and re-taught the calibration many times a second.
+        if (!raw) {
+            if (distanceM == track.sharedRangeM) return
+            track.sharedRangeM = distanceM
+        }
         val range = if (raw) {
             track.rangeWindow.addLast(distanceM.coerceAtLeast(0f))
             if (track.rangeWindow.size > RANGE_MEDIAN_WINDOW) track.rangeWindow.removeFirst()
@@ -108,12 +116,13 @@ class ProximityTracker {
             distanceM
         }
         track.rangeM = range
-        track.rangeTimeMs = SystemClock.elapsedRealtime()
+        track.rangeTimeMs = clock()
 
         // Below this the ranging error is as large as the distance itself and would only
-        // teach the calibration noise.
+        // teach the calibration noise. While the phones move, the range lags seconds behind
+        // the signal, and learning from it would cancel the very change the signal shows.
         val rssi = track.rssi
-        if (rssi != null && range >= LEARN_MIN_RANGE_M) {
+        if (rssi != null && range >= LEARN_MIN_RANGE_M && track.trend == Trend.STEADY) {
             val observedP1m = rssi + 10f * PATH_LOSS_EXPONENT * log10(range)
             track.p1mDbm = (track.p1mDbm + LEARN_RATE * (observedP1m - track.p1mDbm)).coerceIn(P1M_MIN, P1M_MAX)
         }
@@ -122,13 +131,13 @@ class ProximityTracker {
 
     /** Smoothed signal strength of [peerId] on the advertisement scale, if it was heard recently. */
     fun recentRssi(peerId: Long): Float? =
-        states[peerId]?.takeIf { SystemClock.elapsedRealtime() - it.updatedMs < 2_000L }?.smoothedRssi
+        states[peerId]?.takeIf { clock() - it.updatedMs < 2_000L }?.smoothedRssi
 
     /** This phone's filtered Wi-Fi range to [peerId], for sharing with that phone. */
     fun rangeTo(peerId: Long): Float? = tracks[peerId]?.rangeM
 
     private fun publish(peerId: Long, track: Track) {
-        val now = SystemClock.elapsedRealtime()
+        val now = clock()
         val rangeAge = now - track.rangeTimeMs
         val range = track.rangeM?.takeIf { rangeAge < RANGE_FRESH_MS }?.coerceAtLeast(MIN_DISTANCE_M)
         val ble = track.rssi?.let { 10f.pow((track.p1mDbm - it) / (10f * PATH_LOSS_EXPONENT)) }
@@ -142,9 +151,15 @@ class ProximityTracker {
             else -> ble ?: range ?: return
         }
 
-        val level = -10f * PATH_LOSS_EXPONENT * log10(distance.coerceAtLeast(MIN_DISTANCE_M))
+        // The trend comes from the signal alone. The distance above lags behind it: its Wi-Fi
+        // part is a median over several seconds, and calibration shifts its Bluetooth part.
+        track.rssi?.let { updateTrend(track, now, it) }
+        states[peerId] = Proximity(distance, usesWifi = range != null, track.rssi, track.trend, now)
+    }
+
+    private fun updateTrend(track: Track, now: Long, rssi: Float) {
         val history = track.history
-        history.addLast(now to level)
+        history.addLast(now to rssi)
         while (now - history.first().first > TREND_HISTORY_MS) history.removeFirst()
         val recent = history.filter { now - it.first <= TREND_RECENT_MS }.map { it.second }
         val older = history.filter { now - it.first >= TREND_OLDER_MS }.map { it.second }
@@ -159,7 +174,6 @@ class ProximityTracker {
                 else -> track.trend
             }
         }
-        states[peerId] = Proximity(distance, usesWifi = range != null, track.rssi, track.trend, now)
     }
 
     private companion object {

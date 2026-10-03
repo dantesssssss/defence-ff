@@ -31,7 +31,7 @@ import java.nio.ByteBuffer
  * where advertisements no longer get through.
  *
  * Every phone runs the server side. For each pair, the phone with the higher ID connects,
- * reads the connection RSSI a few times a second and writes it to the other phone, so both
+ * reads the connection RSSI ten times a second and writes it to the other phone, so both
  * ends see the same reading. Some phones never get an answer to the RSSI read (seen on a
  * Pixel 7 running an Android beta); such a phone sets [canMeasure] to false, advertises that,
  * and the other phone takes over the measuring role.
@@ -239,7 +239,7 @@ class BeaconLink(
     }
 
     private companion object {
-        const val RSSI_INTERVAL_MS = 250L
+        const val RSSI_INTERVAL_MS = 100L
         const val CONNECT_TIMEOUT_MS = 10_000L
         const val RSSI_TIMEOUT_MS = 2_000L
         const val NO_RSSI_GIVE_UP_MS = 4_000L
