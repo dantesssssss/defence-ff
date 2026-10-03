@@ -7,7 +7,7 @@ import kotlin.math.roundToInt
  * 24-byte big-endian payload carried in the advertisement (manufacturer data).
  *
  * 0–3 device ID, 4 flags (bit0 cannot read connection RSSI, bit1 has barometer, bit2 has GPS
- * fix, bit3 Wi-Fi ranging from this phone keeps failing), 5 battery %,
+ * fix, bit3 Wi-Fi ranging from this phone keeps failing, bit4 emergency), 5 battery %,
  * 6–7 pressure (Pa − 80000, 0xFFFF = none), 8–11 lat × 1e7, 12–15 lon × 1e7
  * (0x7FFFFFFF = none), 16 fix age in minutes, 17 sequence, 18–21 ID of the phone this one
  * last ranged over Wi-Fi, 22–23 that distance in cm (0xFFFF = none).
@@ -25,6 +25,8 @@ data class BeaconPayload(
     /** This phone cannot act as the measuring end of the Bluetooth link / of Wi-Fi ranging. */
     val cannotMeasureRssi: Boolean = false,
     val cannotRange: Boolean = false,
+    /** The user asked for help; rescuers only look for phones with this set. */
+    val emergency: Boolean = false,
 ) {
     fun encode(): ByteArray {
         val hasFix = lat != null && lon != null
@@ -33,6 +35,7 @@ data class BeaconPayload(
         if (hasFix) flags = flags or FLAG_GPS_FIX
         if (cannotMeasureRssi) flags = flags or FLAG_NO_RSSI
         if (cannotRange) flags = flags or FLAG_NO_RANGE
+        if (emergency) flags = flags or FLAG_EMERGENCY
         return ByteBuffer.allocate(SIZE)
             .putInt(deviceId.toInt())
             .put(flags.toByte())
@@ -54,6 +57,7 @@ data class BeaconPayload(
         private const val FLAG_BAROMETER = 1 shl 1
         private const val FLAG_NO_RANGE = 1 shl 3
         private const val FLAG_GPS_FIX = 1 shl 2
+        private const val FLAG_EMERGENCY = 1 shl 4
         private const val PRESSURE_BASE = 80000
         private const val NO_COORD = 0x7FFFFFFF
 
@@ -83,6 +87,7 @@ data class BeaconPayload(
                 rangedDistanceCm = rangedCm.takeIf { it != 0xFFFF },
                 cannotMeasureRssi = flags and FLAG_NO_RSSI != 0,
                 cannotRange = flags and FLAG_NO_RANGE != 0,
+                emergency = flags and FLAG_EMERGENCY != 0,
             )
         }
     }
