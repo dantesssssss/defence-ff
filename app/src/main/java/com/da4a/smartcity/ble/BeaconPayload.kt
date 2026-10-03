@@ -4,11 +4,13 @@ import java.nio.ByteBuffer
 import kotlin.math.roundToInt
 
 /**
- * 18-byte big-endian payload carried in the scan response (manufacturer data).
+ * 24-byte big-endian payload carried in the advertisement (manufacturer data).
  *
- * 0–3 device ID, 4 flags (bit1 has barometer, bit2 has GPS fix), 5 battery %,
+ * 0–3 device ID, 4 flags (bit0 cannot read connection RSSI, bit1 has barometer, bit2 has GPS
+ * fix, bit3 Wi-Fi ranging from this phone keeps failing), 5 battery %,
  * 6–7 pressure (Pa − 80000, 0xFFFF = none), 8–11 lat × 1e7, 12–15 lon × 1e7
- * (0x7FFFFFFF = none), 16 fix age in minutes, 17 sequence.
+ * (0x7FFFFFFF = none), 16 fix age in minutes, 17 sequence, 18–21 ID of the phone this one
+ * last ranged over Wi-Fi, 22–23 that distance in cm (0xFFFF = none).
  */
 data class BeaconPayload(
     val deviceId: Long,
@@ -18,12 +20,19 @@ data class BeaconPayload(
     val lon: Double?,
     val fixAgeMin: Int,
     val seq: Int,
+    val rangedPeerId: Long? = null,
+    val rangedDistanceCm: Int? = null,
+    /** This phone cannot act as the measuring end of the Bluetooth link / of Wi-Fi ranging. */
+    val cannotMeasureRssi: Boolean = false,
+    val cannotRange: Boolean = false,
 ) {
     fun encode(): ByteArray {
         val hasFix = lat != null && lon != null
         var flags = 0
         if (pressurePa != null) flags = flags or FLAG_BAROMETER
         if (hasFix) flags = flags or FLAG_GPS_FIX
+        if (cannotMeasureRssi) flags = flags or FLAG_NO_RSSI
+        if (cannotRange) flags = flags or FLAG_NO_RANGE
         return ByteBuffer.allocate(SIZE)
             .putInt(deviceId.toInt())
             .put(flags.toByte())
@@ -33,21 +42,26 @@ data class BeaconPayload(
             .putInt(if (hasFix) (lon!! * 1e7).roundToInt() else NO_COORD)
             .put(fixAgeMin.coerceIn(0, 255).toByte())
             .put(seq.toByte())
+            .putInt(rangedPeerId?.toInt() ?: 0)
+            .putShort((rangedDistanceCm?.coerceIn(0, 0xFFFE) ?: 0xFFFF).toShort())
             .array()
     }
 
     companion object {
-        const val SIZE = 18
+        const val SIZE = 24
+        private const val SIZE_WITHOUT_RANGE = 18
+        private const val FLAG_NO_RSSI = 1 shl 0
         private const val FLAG_BAROMETER = 1 shl 1
+        private const val FLAG_NO_RANGE = 1 shl 3
         private const val FLAG_GPS_FIX = 1 shl 2
         private const val PRESSURE_BASE = 80000
         private const val NO_COORD = 0x7FFFFFFF
 
         fun decode(bytes: ByteArray?): BeaconPayload? {
-            if (bytes == null || bytes.size < SIZE) return null
+            if (bytes == null || bytes.size < SIZE_WITHOUT_RANGE) return null
             val buf = ByteBuffer.wrap(bytes)
             val deviceId = buf.int.toLong() and 0xFFFFFFFFL
-            buf.get() // flags are implied by the sentinel values below
+            val flags = buf.get().toInt() // barometer and GPS bits are implied by sentinels
             val battery = buf.get().toInt() and 0xFF
             val pressure = buf.short.toInt() and 0xFFFF
             val lat = buf.int
@@ -55,6 +69,8 @@ data class BeaconPayload(
             val fixAge = buf.get().toInt() and 0xFF
             val seq = buf.get().toInt() and 0xFF
             val hasFix = lat != NO_COORD && lon != NO_COORD
+            val rangedPeer = if (bytes.size >= SIZE) buf.int.toLong() and 0xFFFFFFFFL else null
+            val rangedCm = if (bytes.size >= SIZE) buf.short.toInt() and 0xFFFF else 0xFFFF
             return BeaconPayload(
                 deviceId = deviceId,
                 batteryPct = battery,
@@ -63,6 +79,10 @@ data class BeaconPayload(
                 lon = if (hasFix) lon / 1e7 else null,
                 fixAgeMin = fixAge,
                 seq = seq,
+                rangedPeerId = rangedPeer.takeIf { rangedCm != 0xFFFF },
+                rangedDistanceCm = rangedCm.takeIf { it != 0xFFFF },
+                cannotMeasureRssi = flags and FLAG_NO_RSSI != 0,
+                cannotRange = flags and FLAG_NO_RANGE != 0,
             )
         }
     }
