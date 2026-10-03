@@ -57,7 +57,8 @@ class BeaconService : Service() {
 
     private fun notification(emergency: Boolean): Notification {
         val channel = if (emergency) {
-            NotificationChannel(CHANNEL_EMERGENCY, "Emergency mode", NotificationManager.IMPORTANCE_HIGH)
+            // Not a heads-up: the victim has just pressed SOS, and a banner would cover their screen.
+            NotificationChannel(CHANNEL_EMERGENCY, "Emergency mode", NotificationManager.IMPORTANCE_DEFAULT)
         } else {
             NotificationChannel(CHANNEL_SEARCH, "Searching", NotificationManager.IMPORTANCE_LOW)
         }
@@ -73,6 +74,7 @@ class BeaconService : Service() {
             .setColor(if (emergency) 0xFFFF453A.toInt() else 0xFF0A84FF.toInt())
             .setContentIntent(open)
             .setOngoing(true)
+            .setSilent(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
     }
@@ -84,7 +86,7 @@ class BeaconService : Service() {
 
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_SEARCH = "search"
-        private const val CHANNEL_EMERGENCY = "emergency"
+        private const val CHANNEL_EMERGENCY = "sos"
 
         /** The engine of this process while the service runs. */
         var engine by mutableStateOf<BeaconEngine?>(null)

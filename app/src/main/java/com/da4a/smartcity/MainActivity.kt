@@ -10,12 +10,19 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.da4a.smartcity.beacon.BeaconService
 import com.da4a.smartcity.beacon.Permissions
 import com.da4a.smartcity.ui.BeaconScreen
+import com.da4a.smartcity.ui.EmergencyScreen
 import com.da4a.smartcity.ui.theme.SmartCityTheme
 
 class MainActivity : ComponentActivity() {
+
+    /** Set when opened from the Emergency widget; cleared once the user confirms they are safe. */
+    private var emergencyRequested by mutableStateOf(false)
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startIfReady() }
@@ -31,19 +38,37 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        emergencyRequested = intent?.action == ACTION_EMERGENCY
         requestPermissions()
 
         setContent {
             SmartCityTheme {
                 val engine = BeaconService.engine
-                BeaconScreen(
-                    ownPressurePa = engine?.pressure?.pressurePa,
-                    peers = engine?.scanner?.peers?.values ?: emptyList(),
-                    proximity = engine?.proximity?.states ?: emptyMap(),
-                    running = engine?.running == true,
-                    onRetry = ::requestPermissions,
-                )
+                if (emergencyRequested || engine?.emergency == true) {
+                    EmergencyScreen(
+                        running = engine?.running == true && engine.emergency,
+                        proximity = engine?.proximity?.states ?: emptyMap(),
+                        onRetry = ::requestPermissions,
+                        onSafe = ::stopEmergency,
+                    )
+                } else {
+                    BeaconScreen(
+                        ownPressurePa = engine?.pressure?.pressurePa,
+                        peers = engine?.scanner?.peers?.values ?: emptyList(),
+                        proximity = engine?.proximity?.states ?: emptyMap(),
+                        running = engine?.running == true,
+                        onRetry = ::requestPermissions,
+                    )
+                }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == ACTION_EMERGENCY) {
+            emergencyRequested = true
+            requestPermissions()
         }
     }
 
@@ -64,9 +89,19 @@ class MainActivity : ComponentActivity() {
         if (!Permissions.BLUETOOTH.all { Permissions.granted(this, it) }) return
         val adapter = getSystemService(BluetoothManager::class.java)?.adapter ?: return
         if (adapter.isEnabled) {
-            BeaconService.send(this, BeaconService.ACTION_SEARCH)
+            BeaconService.send(this, if (emergencyRequested) BeaconService.ACTION_EMERGENCY else BeaconService.ACTION_SEARCH)
         } else if (askToEnable) {
             enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
         }
+    }
+
+    private fun stopEmergency() {
+        emergencyRequested = false
+        BeaconService.send(this, BeaconService.ACTION_SAFE)
+    }
+
+    companion object {
+        /** Intent action the Emergency widget opens the app with. */
+        const val ACTION_EMERGENCY = "com.da4a.smartcity.EMERGENCY"
     }
 }

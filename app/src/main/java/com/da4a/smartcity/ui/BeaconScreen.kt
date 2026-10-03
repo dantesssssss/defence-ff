@@ -80,11 +80,11 @@ import com.da4a.smartcity.ui.theme.SmartCityTheme
 import kotlinx.coroutines.delay
 import java.util.Locale
 
-private const val HERE_M = 1.5f
-private const val NEAR_M = 5f
+internal const val HERE_M = 1.5f
+internal const val NEAR_M = 5f
 
 // Short gaps are normal and keep the last reading; this long without one, the link is gone.
-private const val SIGNAL_LOST_MS = 5_000L
+internal const val SIGNAL_LOST_MS = 5_000L
 
 private const val SEARCHING_CLOSENESS = 0.3f
 
