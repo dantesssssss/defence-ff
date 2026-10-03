@@ -3,7 +3,6 @@ package com.da4a.smartcity.ui
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -12,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,9 +37,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +54,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
@@ -60,8 +63,8 @@ import com.da4a.smartcity.ble.BeaconPayload
 import com.da4a.smartcity.ble.Peer
 import com.da4a.smartcity.estimation.Proximity
 import com.da4a.smartcity.estimation.Trend
-import com.da4a.smartcity.estimation.elevationLabel
 import com.da4a.smartcity.estimation.heightAboveM
+import com.da4a.smartcity.estimation.levelText
 import com.da4a.smartcity.ui.theme.IosBackground
 import com.da4a.smartcity.ui.theme.IosBlue
 import com.da4a.smartcity.ui.theme.IosGreen
@@ -161,10 +164,7 @@ fun BeaconScreen(
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     ProximityCircle(closeness, style)
                 }
-                Column(Modifier.alpha(detailsAlpha), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ElevationBadge(ownPressurePa, peer?.payload?.pressurePa, peer?.id, surface, secondary)
-                    InfoTiles(peer?.payload, surface, secondary)
-                }
+                InfoTiles(peer?.payload, ownPressurePa, peer?.id, surface, secondary, Modifier.alpha(detailsAlpha))
             }
         }
     }
@@ -185,43 +185,19 @@ private fun Header(title: String, subtitle: String, subtitleColor: Color) {
     }
 }
 
-/** "↑ 3 m above you"; tapping it with the phones side by side cancels the barometers' bias. */
 @Composable
-private fun ElevationBadge(ownPa: Float?, peerPa: Int?, peerId: Long?, surface: Color, secondary: Color) {
-    var offsetPa by rememberSaveable(peerId) { mutableStateOf<Float?>(null) }
-    val haptics = LocalHapticFeedback.current
-    Column(
-        Modifier.fillMaxWidth().height(68.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+private fun InfoTiles(
+    payload: BeaconPayload?,
+    ownPressurePa: Float?,
+    peerId: Long?,
+    surface: Color,
+    secondary: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (ownPa == null || peerPa == null) return@Column
-        Text(
-            elevationLabel(heightAboveM(ownPa, peerPa.toFloat(), offsetPa ?: 0f)),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .clip(CircleShape)
-                .background(surface)
-                .clickable(interactionSource = null, indication = null) {
-                    offsetPa = ownPa - peerPa
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                }
-                .animateContentSize()
-                .padding(horizontal = 20.dp, vertical = 11.dp),
-        )
-        if (offsetPa == null) {
-            Text(
-                "Hold phones together and tap to level",
-                style = MaterialTheme.typography.bodySmall,
-                color = secondary,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun InfoTiles(payload: BeaconPayload?, surface: Color, secondary: Color) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Tile("Battery", surface, secondary) {
             if (payload == null) {
                 Value("—")
@@ -240,25 +216,49 @@ private fun InfoTiles(payload: BeaconPayload?, surface: Color, secondary: Color)
                 Value("No fix", color = secondary)
             }
         }
-        Tile("Pressure", surface, secondary) {
-            val pa = payload?.pressurePa
-            if (pa == null) {
-                Value("—")
-            } else {
-                Value(String.format(Locale.US, "%.1f", pa / 100f))
-                Text("hPa", style = MaterialTheme.typography.bodySmall, color = secondary)
-            }
+        LevelTile(ownPressurePa, payload?.pressurePa, peerId, surface, secondary)
+    }
+}
+
+/**
+ * How far above or below the other phone is. Long-pressing it with the phones side by side
+ * cancels the bias between the two barometers; there is deliberately no hint for it on screen.
+ */
+@Composable
+private fun RowScope.LevelTile(ownPa: Float?, peerPa: Int?, peerId: Long?, surface: Color, secondary: Color) {
+    var offsetPa by rememberSaveable(peerId) { mutableFloatStateOf(0f) }
+    val haptics = LocalHapticFeedback.current
+    val level by rememberUpdatedState {
+        if (ownPa != null && peerPa != null) {
+            offsetPa = ownPa - peerPa
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        }
+    }
+    Tile("Level", surface, secondary, Modifier.pointerInput(Unit) { detectTapGestures(onLongPress = { level() }) }) {
+        if (ownPa == null || peerPa == null) {
+            Value("—")
+        } else {
+            val text = levelText(heightAboveM(ownPa, peerPa.toFloat(), offsetPa))
+            Value(text.value)
+            Text(text.detail, style = MaterialTheme.typography.bodySmall, color = secondary)
         }
     }
 }
 
 @Composable
-private fun RowScope.Tile(title: String, surface: Color, secondary: Color, content: @Composable ColumnScope.() -> Unit) {
+private fun RowScope.Tile(
+    title: String,
+    surface: Color,
+    secondary: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Column(
         Modifier
             .weight(1f)
             .fillMaxHeight()
             .clip(RoundedCornerShape(16.dp))
+            .then(modifier)
             .background(surface)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),

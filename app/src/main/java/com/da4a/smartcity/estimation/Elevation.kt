@@ -18,8 +18,11 @@ const val SAME_LEVEL_M = 1.5f
 fun heightAboveM(ownPa: Float, peerPa: Float, offsetPa: Float = 0f): Float =
     (ownPa - peerPa - offsetPa) * M_PER_PA
 
-fun elevationLabel(heightM: Float): String = when {
-    abs(heightM) < SAME_LEVEL_M -> "Same level"
-    heightM > 0 -> "↑ ${heightM.roundToInt()} m above you"
-    else -> "↓ ${(-heightM).roundToInt()} m below you"
+/** Two lines for the Level tile: a short value and what it means. */
+data class LevelText(val value: String, val detail: String)
+
+fun levelText(heightM: Float): LevelText = when {
+    abs(heightM) < SAME_LEVEL_M -> LevelText("Same", "level")
+    heightM > 0 -> LevelText("↑ ${heightM.roundToInt()} m", "above you")
+    else -> LevelText("↓ ${(-heightM).roundToInt()} m", "below you")
 }

@@ -27,15 +27,15 @@ class ElevationTest {
 
     @Test
     fun smallDifferencesReadAsSameLevel() {
-        assertEquals("Same level", elevationLabel(0f))
-        assertEquals("Same level", elevationLabel(1.4f))
-        assertEquals("Same level", elevationLabel(-1.4f))
+        assertEquals(LevelText("Same", "level"), levelText(0f))
+        assertEquals(LevelText("Same", "level"), levelText(1.4f))
+        assertEquals(LevelText("Same", "level"), levelText(-1.4f))
     }
 
     @Test
-    fun labelsRoundToWholeMetres() {
-        assertEquals("↑ 3 m above you", elevationLabel(2.988f))
-        assertEquals("↓ 2 m below you", elevationLabel(-2.4f))
-        assertEquals("↑ 2 m above you", elevationLabel(1.6f))
+    fun levelTextRoundsToWholeMetres() {
+        assertEquals(LevelText("↑ 3 m", "above you"), levelText(2.988f))
+        assertEquals(LevelText("↓ 2 m", "below you"), levelText(-2.4f))
+        assertEquals(LevelText("↑ 2 m", "above you"), levelText(1.6f))
     }
 }
