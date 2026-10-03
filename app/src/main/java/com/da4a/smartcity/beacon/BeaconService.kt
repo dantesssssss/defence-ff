@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.app.NotificationCompat
 import com.da4a.smartcity.MainActivity
 import com.da4a.smartcity.R
+import com.da4a.smartcity.widget.EmergencyWidget
 
 /**
  * Keeps the one [BeaconEngine] of this process running in the foreground, so a victim's phone
@@ -34,12 +35,14 @@ class BeaconService : Service() {
         }
         goForeground(current.emergency)
         current.start()
+        EmergencyWidget.refresh(this)
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         engine?.stop()
         engine = null
+        EmergencyWidget.refresh(this)
         super.onDestroy()
     }
 
