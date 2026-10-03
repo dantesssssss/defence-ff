@@ -21,7 +21,7 @@ import com.da4a.smartcity.ui.theme.SmartCityTheme
 
 class MainActivity : ComponentActivity() {
 
-    /** Set when opened from the Emergency widget; cleared once the user confirms they are safe. */
+    /** Set when opened from the Emergency widget. */
     private var emergencyRequested by mutableStateOf(false)
 
     private val permissionLauncher =
@@ -44,9 +44,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             SmartCityTheme {
                 val engine = BeaconService.engine
-                if (emergencyRequested || engine?.emergency == true) {
+                // After "I'm safe" the service is already gone while the app animates closed;
+                // keep the screen as it was instead of flashing another state.
+                val closing = isFinishing
+                if (closing || emergencyRequested || engine?.emergency == true) {
                     EmergencyScreen(
-                        running = engine?.running == true && engine.emergency,
+                        running = closing || (engine?.running == true && engine.emergency),
                         proximity = engine?.proximity?.states ?: emptyMap(),
                         onRetry = ::requestPermissions,
                         onSafe = ::stopEmergency,
@@ -95,9 +98,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** The victim is safe: end the SOS entirely and go back to the home screen. */
     private fun stopEmergency() {
-        emergencyRequested = false
-        BeaconService.send(this, BeaconService.ACTION_SAFE)
+        finishAndRemoveTask()
+        stopService(Intent(this, BeaconService::class.java))
     }
 
     companion object {

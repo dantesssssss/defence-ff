@@ -10,22 +10,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -39,18 +35,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.da4a.smartcity.estimation.Proximity
 import com.da4a.smartcity.estimation.Trend
-import com.da4a.smartcity.ui.theme.IosAlertBackground
-import com.da4a.smartcity.ui.theme.IosBlue
 import com.da4a.smartcity.ui.theme.IosLabel
 import com.da4a.smartcity.ui.theme.IosRed
-import com.da4a.smartcity.ui.theme.IosSeparator
+import com.da4a.smartcity.ui.theme.IosTertiaryFill
 import com.da4a.smartcity.ui.theme.SmartCityTheme
 import kotlinx.coroutines.delay
 
@@ -129,7 +121,7 @@ fun EmergencyScreen(
     }
 
     if (confirming) {
-        SafeAlert(
+        SafeDialog(
             onKeepSearching = { confirming = false },
             onSafe = {
                 confirming = false
@@ -139,48 +131,20 @@ fun EmergencyScreen(
     }
 }
 
-/** iOS-style two-button alert; stopping the SOS takes this deliberate second tap. */
+/** Standard Android confirmation; stopping the SOS takes this deliberate second tap. */
 @Composable
-private fun SafeAlert(onKeepSearching: () -> Unit, onSafe: () -> Unit) {
-    Dialog(onDismissRequest = onKeepSearching) {
-        Column(
-            Modifier
-                .width(270.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(IosAlertBackground),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                "Are you safe?",
-                style = MaterialTheme.typography.titleMedium,
-                color = IosLabel,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp),
-            )
-            Text(
-                "Rescuers will no longer be able to find this phone.",
-                style = MaterialTheme.typography.bodySmall,
-                color = IosLabel,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 20.dp),
-            )
-            Box(Modifier.fillMaxWidth().height(0.5.dp).background(IosSeparator))
-            Row(Modifier.height(IntrinsicSize.Min)) {
-                AlertButton("Keep searching", IosBlue, FontWeight.SemiBold, onKeepSearching, Modifier.weight(1f))
-                Box(Modifier.width(0.5.dp).fillMaxHeight().background(IosSeparator))
-                AlertButton("I'm safe", IosRed, FontWeight.Normal, onSafe, Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun AlertButton(text: String, color: Color, weight: FontWeight, onClick: () -> Unit, modifier: Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = weight),
-        color = color,
-        textAlign = TextAlign.Center,
-        modifier = modifier.clickable(onClick = onClick).padding(vertical = 11.dp),
+private fun SafeDialog(onKeepSearching: () -> Unit, onSafe: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onKeepSearching,
+        title = { Text("Are you safe?") },
+        text = { Text("Rescuers will no longer be able to find this phone.") },
+        confirmButton = {
+            TextButton(onClick = onSafe) { Text("I'm safe", color = IosRed) }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeepSearching) { Text("Keep searching") }
+        },
+        containerColor = IosTertiaryFill,
     )
 }
 

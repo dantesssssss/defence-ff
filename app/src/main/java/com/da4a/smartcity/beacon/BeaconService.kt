@@ -21,7 +21,8 @@ import com.da4a.smartcity.widget.EmergencyWidget
 /**
  * Keeps the one [BeaconEngine] of this process running in the foreground, so a victim's phone
  * stays findable with the screen locked. The open app runs it in search mode; the Emergency
- * widget path switches it to emergency mode, which only "I'm safe" in the app ends.
+ * widget path switches it to emergency mode, which only "I'm safe" in the app ends, by
+ * stopping the service.
  */
 class BeaconService : Service() {
 
@@ -29,10 +30,7 @@ class BeaconService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val current = engine ?: BeaconEngine(this).also { engine = it }
-        when (intent?.action) {
-            ACTION_EMERGENCY -> current.emergency = true
-            ACTION_SAFE -> current.emergency = false
-        }
+        if (intent?.action == ACTION_EMERGENCY) current.emergency = true
         goForeground(current.emergency)
         current.start()
         EmergencyWidget.refresh(this)
@@ -85,7 +83,6 @@ class BeaconService : Service() {
     companion object {
         const val ACTION_SEARCH = "com.da4a.smartcity.action.SEARCH"
         const val ACTION_EMERGENCY = "com.da4a.smartcity.action.START_EMERGENCY"
-        const val ACTION_SAFE = "com.da4a.smartcity.action.SAFE"
 
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_SEARCH = "search"

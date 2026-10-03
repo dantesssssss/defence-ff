@@ -18,7 +18,7 @@ Demo-only scope: hardcoded victim profile, no settings, no backend.
 | Topic | Decision |
 |---|---|
 | Widget tap | Opens a full-screen red Emergency screen **and** starts the beacon in a foreground service, so it survives locking the phone. |
-| Stopping | "I'm safe" button on the Emergency screen, then an iOS-style confirmation alert. Nothing else stops emergency mode. |
+| Stopping | "I'm safe" button on the Emergency screen, then a standard Android (Material 3) confirmation dialog. Confirming stops the service and closes the app to the home screen. Nothing else stops emergency mode. |
 | Widget look | Square 2×2. Idle: dark card with a red SOS button. Active: red card, "Searching for you…". |
 | Victim info | iOS Medical ID-style card at the top of the rescuer screen; status text ("Nearby" / "Getting closer") sits under it. |
 | Pressure tile | Replaced by a **Level** tile: "Same / level", "↑ 3 m / above you", "↓ 2 m / below you". |
@@ -29,7 +29,7 @@ Demo-only scope: hardcoded victim profile, no settings, no backend.
 ```
  EmergencyWidget ──tap──▶ MainActivity (ACTION_EMERGENCY) ──▶ permissions / Bluetooth on
                                       │
-                                      ▼ startForegroundService(SEARCH | EMERGENCY | SAFE)
+                                      ▼ startForegroundService(SEARCH | EMERGENCY)
                                BeaconService  (foreground, connectedDevice|location)
                                       │ owns exactly one
                                       ▼
@@ -61,7 +61,6 @@ A foreground service that holds the single engine in `companion object { var eng
 |---|---|
 | `SEARCH` | Ensure the engine is running. Does **not** clear an active emergency. |
 | `EMERGENCY` | Ensure running, set `engine.emergency = true`. |
-| `SAFE` | Set `engine.emergency = false`. The service stays up in search mode, because the app is on screen. |
 
 - `startForeground` types are computed from the granted permissions: always `connectedDevice`, plus
   `location` only if location is granted (API 34+ throws otherwise). Use the plain 2-arg call on API 28.
@@ -131,9 +130,10 @@ The thresholds stay as they are (`SAME_LEVEL_M = 1.5`, whole metres).
 - While the engine isn't running yet (permissions being requested, Bluetooth off), the title is
   "Starting emergency mode…" and "I'm safe" is hidden. If Bluetooth can't start, the screen shows
   "Allow Bluetooth to send an SOS" with a white **Try again** capsule.
-- **I'm safe** opens an iOS-style alert (a custom `Dialog`: 270 dp wide, 14 dp corners, dark surface):
+- **I'm safe** opens a standard Material 3 `AlertDialog` (dark surface), because an iOS-style alert looked out of place on Android:
   - Title "Are you safe?", message "Rescuers will no longer be able to find this phone."
-  - Buttons side by side: **Keep searching** (bold, blue, dismisses) and **I'm safe** (red), which sends `SAFE`.
+  - Text buttons **Keep searching** (dismisses) and **I'm safe** (red).
+  - **I'm safe** closes the app with `finishAndRemoveTask()` and stops the service. The SOS, its notification and the red widget all end, and the victim is back on the home screen.
 
 ### Widget — `widget/EmergencyWidget.kt` (new, RemoteViews, no new dependencies)
 
