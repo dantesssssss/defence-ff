@@ -133,7 +133,7 @@ The thresholds stay as they are (`SAME_LEVEL_M = 1.5`, whole metres).
 - **I'm safe** opens a standard Material 3 `AlertDialog` (dark surface), because an iOS-style alert looked out of place on Android:
   - Title "Are you safe?", message "Rescuers will no longer be able to find this phone."
   - Text buttons **Keep searching** (dismisses) and **I'm safe** (red).
-  - **I'm safe** closes the app with `finishAndRemoveTask()` and stops the service. The SOS, its notification and the red widget all end, and the victim is back on the home screen.
+  - **I'm safe** closes the app with `finishAndRemoveTask()` and calls `BeaconService.endEmergency()`. That broadcasts `emergency = false` for 2 s and then stops the service. Rescuers keep a silent phone's last state, so without that announcement they would keep showing the victim. The SOS, its notification and the red widget then end, and the victim is back on the home screen.
 
 ### Widget — `widget/EmergencyWidget.kt` (new, RemoteViews, no new dependencies)
 

@@ -24,6 +24,9 @@ class MainActivity : ComponentActivity() {
     /** Set when opened from the Emergency widget. */
     private var emergencyRequested by mutableStateOf(false)
 
+    /** Set after "I'm safe"; the service then stops itself once rescuers have heard. */
+    private var safe = false
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { startIfReady() }
 
@@ -77,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         // Searching belongs to the open app; an emergency keeps running without it.
-        if (!isChangingConfigurations && BeaconService.engine?.emergency != true) {
+        if (!isChangingConfigurations && !safe && BeaconService.engine?.emergency != true) {
             stopService(Intent(this, BeaconService::class.java))
         }
         super.onDestroy()
@@ -98,10 +101,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** The victim is safe: end the SOS entirely and go back to the home screen. */
+    /** The victim is safe: end the SOS and go back to the home screen. */
     private fun stopEmergency() {
+        safe = true
         finishAndRemoveTask()
-        stopService(Intent(this, BeaconService::class.java))
+        BeaconService.endEmergency(this)
     }
 
     companion object {

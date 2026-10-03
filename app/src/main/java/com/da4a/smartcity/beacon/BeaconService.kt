@@ -9,7 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -21,8 +23,8 @@ import com.da4a.smartcity.widget.EmergencyWidget
 /**
  * Keeps the one [BeaconEngine] of this process running in the foreground, so a victim's phone
  * stays findable with the screen locked. The open app runs it in search mode; the Emergency
- * widget path switches it to emergency mode, which only "I'm safe" in the app ends, by
- * stopping the service.
+ * widget path switches it to emergency mode, which only "I'm safe" in the app ends, through
+ * [endEmergency].
  */
 class BeaconService : Service() {
 
@@ -84,6 +86,10 @@ class BeaconService : Service() {
         const val ACTION_SEARCH = "com.da4a.smartcity.action.SEARCH"
         const val ACTION_EMERGENCY = "com.da4a.smartcity.action.START_EMERGENCY"
 
+        // Rescuers scan continuously and each set advertises every 100 ms, so this is dozens of
+        // chances for every rescuer in range to hear that the emergency is over.
+        private const val ANNOUNCE_SAFE_MS = 2_000L
+
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_SEARCH = "search"
         private const val CHANNEL_EMERGENCY = "sos"
@@ -94,6 +100,20 @@ class BeaconService : Service() {
 
         fun send(context: Context, action: String) {
             context.startForegroundService(Intent(context, BeaconService::class.java).setAction(action))
+        }
+
+        /**
+         * The victim is safe. Rescuers keep showing the last state they heard from a phone, so
+         * going silent alone would leave them looking at an emergency that is over: first
+         * broadcast that it ended, then stop once they have had time to hear it.
+         */
+        fun endEmergency(context: Context) {
+            engine?.emergency = false
+            val app = context.applicationContext
+            Handler(Looper.getMainLooper()).postDelayed({
+                // Unless the user called for help again in the meantime.
+                if (engine?.emergency != true) app.stopService(Intent(app, BeaconService::class.java))
+            }, ANNOUNCE_SAFE_MS)
         }
     }
 }
