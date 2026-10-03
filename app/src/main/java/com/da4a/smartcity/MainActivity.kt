@@ -13,17 +13,13 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.da4a.smartcity.ble.BeaconAdvertiser
 import com.da4a.smartcity.ble.BeaconLink
@@ -53,11 +49,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var scanner: BeaconScanner
     private lateinit var link: BeaconLink
 
-    private var bluetoothOn by mutableStateOf(false)
     private var running by mutableStateOf(false)
-    private var batteryPct by mutableIntStateOf(0)
     private var seq = 0
-    private var rangingEnabled by mutableStateOf(true)
 
     // Latest Wi-Fi distance measured by this phone, broadcast so the other phone can use it
     // even when its own ranging attempts fail.
@@ -100,7 +93,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Light status bar icons over the black (or green) background.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         adapter = getSystemService(BluetoothManager::class.java)?.adapter
@@ -129,32 +126,17 @@ class MainActivity : ComponentActivity() {
         }
 
         pressure.start()
-        batteryPct = BatterySource.percent(this)
         requestPermissions()
 
         setContent {
-            SmartCityTheme(darkTheme = true, dynamicColor = false) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    BeaconScreen(
-                        deviceId = deviceId,
-                        bluetoothOn = bluetoothOn,
-                        advertiserState = advertiser.state,
-                        scannerState = scanner.state,
-                        hasBarometer = pressure.available,
-                        pressurePa = pressure.pressurePa,
-                        fix = location.fix,
-                        batteryPct = batteryPct,
-                        peers = scanner.peers.values,
-                        rangingState = ranger.state,
-                        linkState = link.state,
-                        rangingEnabled = rangingEnabled,
-                        onRangingEnabled = ::setRanging,
-                        proximity = proximity.states,
-                        running = running,
-                        onRetry = ::requestPermissions,
-                        modifier = Modifier.padding(innerPadding),
-                    )
-                }
+            SmartCityTheme {
+                BeaconScreen(
+                    ownPressurePa = pressure.pressurePa,
+                    peers = scanner.peers.values,
+                    proximity = proximity.states,
+                    running = running,
+                    onRetry = ::requestPermissions,
+                )
             }
         }
     }
@@ -184,7 +166,7 @@ class MainActivity : ComponentActivity() {
             location.start()
         }
         // Wi-Fi ranging is optional: Bluetooth proximity keeps working without it.
-        if (rangingEnabled) startRangingIfPermitted()
+        startRangingIfPermitted()
         if (!bluetoothPermissions.all(::granted)) return
         if (adapter?.isEnabled == true) {
             startBeacon()
@@ -197,14 +179,8 @@ class MainActivity : ComponentActivity() {
         if (granted(Manifest.permission.ACCESS_FINE_LOCATION) && wifiPermissions.all(::granted)) ranger.start()
     }
 
-    private fun setRanging(enabled: Boolean) {
-        rangingEnabled = enabled
-        if (enabled) startRangingIfPermitted() else ranger.stop()
-    }
-
     private fun startBeacon() {
-        bluetoothOn = adapter?.isEnabled == true
-        if (running || !bluetoothOn) return
+        if (running || adapter?.isEnabled != true) return
         running = true
         advertiser.start(buildPayload())
         scanner.start()
@@ -213,12 +189,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun buildPayload(): BeaconPayload {
-        batteryPct = BatterySource.percent(this)
         val fix = location.fix
         val rangeFresh = rangedTimeMs != 0L && SystemClock.elapsedRealtime() - rangedTimeMs < RANGE_SHARE_MS
         return BeaconPayload(
             deviceId = deviceId,
-            batteryPct = batteryPct,
+            batteryPct = BatterySource.percent(this),
             pressurePa = pressure.pressurePa?.roundToInt(),
             lat = fix?.latitude,
             lon = fix?.longitude,
