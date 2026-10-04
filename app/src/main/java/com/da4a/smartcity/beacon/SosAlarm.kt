@@ -64,18 +64,17 @@ class SosAlarm(private val context: Context) {
     }
 
     private fun startSiren() {
+        // Raised before the first sound, so the siren never starts at the user's own level.
+        volumeBefore = audio.getStreamVolume(AudioManager.STREAM_ALARM)
+        setAlarmVolume(audio.getStreamMaxVolume(AudioManager.STREAM_ALARM))
         val attributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ALARM)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build()
         player = MediaPlayer.create(context, R.raw.siren, attributes, audio.generateAudioSessionId())?.apply {
             isLooping = true
-            if (QUIET_FOR_TESTING) setVolume(QUIET_VOLUME, QUIET_VOLUME)
             start()
         }
-        if (QUIET_FOR_TESTING) return
-        volumeBefore = audio.getStreamVolume(AudioManager.STREAM_ALARM)
-        setAlarmVolume(audio.getStreamMaxVolume(AudioManager.STREAM_ALARM))
     }
 
     private fun setAlarmVolume(volume: Int) {
@@ -107,10 +106,5 @@ class SosAlarm(private val context: Context) {
     private companion object {
         // Once a second: easy to spot, and well below the rates that can trigger seizures.
         const val BLINK_MS = 500L
-
-        // While testing, the siren is barely audible and the alarm volume is left alone.
-        // Set to false for real use: full alarm volume.
-        const val QUIET_FOR_TESTING = true
-        const val QUIET_VOLUME = 0.03f
     }
 }
