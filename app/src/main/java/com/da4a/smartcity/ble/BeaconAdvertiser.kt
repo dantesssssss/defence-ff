@@ -145,7 +145,7 @@ class BeaconAdvertiser(
         }
     }
 
-    // Everything rides in the advertisement itself (30 of the 31 available bytes). A scan
+    // Everything rides in the advertisement itself (all 31 available bytes). A scan
     // response would need a request/response exchange per packet, and most of those were lost.
     private fun advertiseData(payload: BeaconPayload) = AdvertiseData.Builder()
         .setIncludeDeviceName(false)

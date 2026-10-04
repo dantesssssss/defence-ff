@@ -86,6 +86,9 @@ internal const val NEAR_M = 5f
 // Short gaps are normal and keep the last reading; this long without one, the link is gone.
 internal const val SIGNAL_LOST_MS = 5_000L
 
+// From here the temperature shows in red: heat that is dangerous to be trapped in.
+private const val HOT_C = 45
+
 private const val SEARCHING_CLOSENESS = 0.3f
 
 @Composable
@@ -207,30 +210,54 @@ private fun InfoTiles(
     secondary: Color,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier.fillMaxWidth().height(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Tile("Battery", surface, secondary) {
-            if (payload == null) {
-                Value("—")
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BatteryGlyph(payload.batteryPct)
-                    Value("${payload.batteryPct}%")
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        TileRow {
+            Tile("Battery", surface, secondary) {
+                if (payload == null) {
+                    Value("—")
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        BatteryGlyph(payload.batteryPct)
+                        Value("${payload.batteryPct}%")
+                    }
+                }
+            }
+            Tile("Temperature", surface, secondary) {
+                if (payload?.temperatureC == null) {
+                    Value("—")
+                } else {
+                    val celsius = payload.temperatureC
+                    Value("$celsius°C", color = if (celsius >= HOT_C) IosRed else IosLabel)
+                    Text(
+                        if (payload.airTemperature) "air at the phone" else "inside the phone",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondary,
+                    )
                 }
             }
         }
-        Tile("Location", surface, secondary) {
-            if (payload?.lat != null && payload.lon != null) {
-                Value(String.format(Locale.US, "%.4f", payload.lat), MaterialTheme.typography.titleMedium)
-                Value(String.format(Locale.US, "%.4f", payload.lon), MaterialTheme.typography.titleMedium)
-            } else {
-                Value("No fix", color = secondary)
+        TileRow {
+            Tile("Location", surface, secondary) {
+                if (payload?.lat != null && payload.lon != null) {
+                    Value(String.format(Locale.US, "%.4f", payload.lat), MaterialTheme.typography.titleMedium)
+                    Value(String.format(Locale.US, "%.4f", payload.lon), MaterialTheme.typography.titleMedium)
+                } else {
+                    Value("No fix", color = secondary)
+                }
             }
+            LevelTile(ownPressurePa, payload?.pressurePa, peerId, surface, secondary)
         }
-        LevelTile(ownPressurePa, payload?.pressurePa, peerId, surface, secondary)
     }
+}
+
+/** Tiles side by side, all as tall as the tallest. */
+@Composable
+private fun TileRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        content = content,
+    )
 }
 
 /**
@@ -349,7 +376,7 @@ private fun PreviewScreen(distanceM: Float?, trend: Trend = Trend.STEADY, silent
     val now = SystemClock.elapsedRealtime()
     val payload = BeaconPayload(
         deviceId = 1, batteryPct = 82, pressurePa = 100_840, lat = 52.2297, lon = 21.0122, fixAgeMin = 0, seq = 0,
-        emergency = true,
+        emergency = true, temperatureC = 31,
     )
     val proximity = distanceM?.let { mapOf(1L to Proximity(it, false, -60f, trend, now - silentMs)) } ?: emptyMap()
     SmartCityTheme {

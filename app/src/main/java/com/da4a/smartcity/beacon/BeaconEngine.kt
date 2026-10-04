@@ -19,14 +19,15 @@ import com.da4a.smartcity.estimation.ProximityTracker
 import com.da4a.smartcity.sensors.BatterySource
 import com.da4a.smartcity.sensors.LocationSource
 import com.da4a.smartcity.sensors.PressureSource
+import com.da4a.smartcity.sensors.TemperatureSource
 import com.da4a.smartcity.wifi.AwareRanger
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
  * Everything one phone runs to be found and to find others: sensors, Bluetooth advertising,
- * scanning and the signal-strength link, Wi-Fi ranging, and the closeness estimate. Public
- * state is Compose state, so screens read it directly.
+ * scanning and the signal-strength link, Wi-Fi ranging, the closeness estimate, and the SOS
+ * light and siren. Public state is Compose state, so screens read it directly.
  */
 class BeaconEngine(private val context: Context) {
 
@@ -35,12 +36,14 @@ class BeaconEngine(private val context: Context) {
     private val adapter: BluetoothAdapter? = context.getSystemService(BluetoothManager::class.java)?.adapter
 
     val pressure = PressureSource(context)
+    private val temperature = TemperatureSource(context)
     private val location = LocationSource(context)
     private val ranger = AwareRanger(context, deviceId)
     val proximity = ProximityTracker()
     private val advertiser = BeaconAdvertiser(adapter)
     val scanner = BeaconScanner(adapter)
     private val link = BeaconLink(context, adapter, deviceId)
+    private val alarm = SosAlarm(context)
 
     /** True once Bluetooth advertising and scanning are up. */
     var running by mutableStateOf(false)
@@ -53,6 +56,7 @@ class BeaconEngine(private val context: Context) {
         get() = emergencyState
         set(value) {
             emergencyState = value
+            if (value) alarm.start() else alarm.stop()
             // Tell rescuers right away instead of at the next refresh.
             if (running) advertiser.update(buildPayload())
         }
@@ -96,6 +100,7 @@ class BeaconEngine(private val context: Context) {
     /** Starts whatever the granted permissions and the adapter allow; safe to call again. */
     fun start() {
         pressure.start()
+        temperature.start()
         if (Permissions.granted(context, Manifest.permission.ACCESS_FINE_LOCATION)) {
             location.stop()
             location.start()
@@ -120,7 +125,9 @@ class BeaconEngine(private val context: Context) {
         }
         location.stop()
         pressure.stop()
+        temperature.stop()
         ranger.stop()
+        alarm.stop()
     }
 
     private fun buildPayload(): BeaconPayload {
@@ -139,6 +146,8 @@ class BeaconEngine(private val context: Context) {
             cannotMeasureRssi = !link.canMeasure,
             cannotRange = ranger.cannotRange,
             emergency = emergency,
+            temperatureC = temperature.celsius?.roundToInt(),
+            airTemperature = temperature.isAir,
         )
     }
 
