@@ -1,9 +1,9 @@
 <resources>
-    <string name="app_name">SmartCity</string>
+    <string name="app_name">ReMe</string>
     <string name="widget_label">Emergency</string>
     <string name="widget_description">Call for help: makes this phone findable by rescuers nearby.</string>
     <string name="widget_idle_caption">✱ Emergency</string>
-    <string name="widget_idle_footer">Tap to call for help nearby</string>
+    <string name="widget_idle_footer">Tap to call for help</string>
     <string name="widget_active_caption">● EMERGENCY ON</string>
     <string name="widget_active_title">Searching\nfor you…</string>
     <string name="widget_active_footer">Stay where you are</string>
